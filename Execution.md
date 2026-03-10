@@ -1,388 +1,492 @@
-# 03 — New Tables & Database Migrations
+# WAR ROOM — Execution Plan
 
-> Database changes needed to support War Room pillars, digest generation, and document export.
-
----
-
-## Overview
-
-The existing schema (42 migrations) covers articles, stories, entities, newsletters, and user profiles. War Room needs **3 new tables** and **1 new RPC function**.
+> One-Click Digest Engine: From Brief to Production
+> Last Updated: March 10, 2026
 
 ---
 
-## New Table 1: `pillar_configs`
+## Original Requirements Brief
 
-Stores the configuration for each intelligence pillar.
+> **WAR ROOM | Feature Development Brief**
+> Confidential — Internal Use Only | March 2026 | Version 1.0
 
-```sql
--- Migration: 042_create_pillar_configs.sql
+### 1. Background & Problem Statement
 
-CREATE TABLE IF NOT EXISTS pillar_configs (
-    id SERIAL PRIMARY KEY,
+The War Room platform currently requires multiple clicks and manual steps for a user to generate an intelligence digest from the live news feeds. This creates friction and slows down the workflow — especially during fast-moving political situations when speed matters most.
 
-    -- Identity
-    slug TEXT NOT NULL UNIQUE,          -- e.g., 'ali-digest', 'opposition-digest'
-    name TEXT NOT NULL,                  -- e.g., 'President Ali Digest'
-    description TEXT,                    -- Used to generate pillar embedding
-    icon TEXT,                           -- Icon identifier for frontend
-    sort_order INTEGER DEFAULT 0,       -- Display order in sidebar
+Inspiration is drawn from the **No News app**, which aggregates multiple RSS feeds and delivers a clean, ready-to-read digest in just a few clicks. The goal is to replicate that simplicity inside War Room, tailored specifically to Guyana's five political intelligence pillars.
 
-    -- Entity Filters
-    -- All entity names + aliases that should match for this pillar
-    entity_filters TEXT[] DEFAULT '{}',  -- e.g., {'Irfaan Ali', 'President Ali', 'Dr. Ali'}
+### 2. The Five Intelligence Pillars
 
-    -- Source Filters (optional — NULL means all sources)
-    -- Array of source IDs from the sources table
-    source_ids INTEGER[],               -- NULL = all sources, [1,2,3] = specific sources only
+War Room tracks five core topic areas, referred to as the **Five Pillars**. Each pillar will have its own dedicated digest:
 
-    -- Keyword Filters (optional — for additional text matching)
-    keywords TEXT[] DEFAULT '{}',        -- e.g., {'president', 'Ali', 'head of state'}
+| Pillar | Description |
+|--------|-------------|
+| **Pillar 1 — President Ali** | News, statements, and coverage of the President of Guyana |
+| **Pillar 2 — VP Jagdeo** | News, statements, and coverage of the Vice President |
+| **Pillar 3 — Azruddin Mohamed** | Entity-filtered feed tracking this specific political figure |
+| **Pillar 4 — Opposition** | Aggregated coverage of all opposition channels and figures |
+| **Pillar 5 — Live Guyana News + International** | Domestic breaking news and foreign coverage of Guyana |
 
-    -- Semantic Matching
-    -- Pre-generated embedding from pillar description (768-dim, Gemini embedding-001)
-    pillar_embedding vector(768),
+### 3. Feature Request: One-Click Digest Engine
 
-    -- Generation Settings
-    max_stories INTEGER DEFAULT 10,      -- Max stories per digest (brief says 5-10)
-    hours_back INTEGER DEFAULT 24,       -- How far back to search for stories
-    refresh_interval_hours INTEGER DEFAULT 3,  -- How often to auto-regenerate
+**3.1 What It Should Do**
 
-    -- Status
-    is_active BOOLEAN DEFAULT TRUE,
-    platform TEXT DEFAULT 'warroom',     -- 'warroom', 'civic_portal', etc.
+For each of the Five Pillars, the platform should automatically:
+- Scrape the relevant RSS feeds and news sources assigned to that pillar
+- Filter articles by the pillar topic (entity, keyword, or source group)
+- Summarise and compile the top stories into a clean digest
+- Format and export the digest as a downloadable document (Word / PDF)
+- Make the digest available in as few clicks as possible — ideally one button per pillar
 
-    -- Timestamps
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+**3.2 Current Problem (Before)**
 
--- Index for quick lookups
-CREATE INDEX idx_pillar_configs_slug ON pillar_configs(slug);
-CREATE INDEX idx_pillar_configs_active ON pillar_configs(is_active) WHERE is_active = TRUE;
-CREATE INDEX idx_pillar_configs_platform ON pillar_configs(platform);
+Currently, to get a digest the user must:
+1. Navigate to the correct feed tab
+2. Wait for articles to load and scrape
+3. Manually select articles
+4. Click to generate the brief
+5. Export or copy the output
 
--- Auto-update timestamp trigger
-CREATE TRIGGER update_pillar_configs_updated_at
-    BEFORE UPDATE ON pillar_configs
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+This is too many steps. It creates delays and increases the chance of missing important stories.
+
+**3.3 Desired Experience (After)**
+
+1. User opens War Room dashboard
+2. User sees five Digest buttons — one per pillar
+3. User clicks one button (e.g. "Ali Digest" or "Opposition Digest")
+4. Platform auto-fetches, filters, and summarises the latest stories for that pillar
+5. A formatted digest document is generated and available to download or email
+
+### 4. Digest Document Format
+
+Each digest should follow this standard structure:
+
+| Section | Content |
+|---------|---------|
+| **Header** | Pillar name, date, time of generation |
+| **Top Stories** | 5–10 most recent and relevant articles with headline, source, time, and 2–3 sentence AI summary |
+| **Key Quotes** | Any notable quotes extracted from the articles |
+| **Sentiment Note** | Brief AI-generated note on overall tone (positive / neutral / negative coverage) |
+| **Export Options** | Download as Word (.docx), PDF, or send via email |
+
+### 5. Technical Implementation Notes
+
+- Each pillar should map to a pre-configured set of RSS sources and keyword/entity filters already defined in the Admin Settings
+- The digest generation should call the existing AI summarisation logic (used in Talking Points / Narratives) but scoped to the filtered article set
+- Digest generation should run server-side and return a pre-formatted document — not require the user to wait for real-time scraping
+- Consider a background refresh every 1–6 hours so digests are near-instant when the user clicks
+- The five digest buttons should be prominently placed on the main dashboard — not buried in a sub-menu
+
+### 6. Priority & Impact
+
+| Feature | Priority | Impact |
+|---------|----------|--------|
+| One-click digest per pillar | **HIGH** | Saves 5+ minutes per digest session |
+| Auto-refresh digest cache | **HIGH** | Near-instant generation on click |
+| Export to Word/PDF | **HIGH** | Ready to share immediately |
+| Email digest direct from platform | **MEDIUM** | Reduces copy/paste workflow |
+| Sentiment indicator per digest | **MEDIUM** | Quick read on media tone |
+
+### 7. Summary
+
+The core ask is simple: **make it as easy to get an intelligence digest from War Room as it is from the No News app.** One button per pillar. Automatic. Fast. Ready to share.
+
+This single improvement will dramatically increase the daily usability of the platform and make it the go-to tool for Guyana political intelligence — whether for morning briefings, rapid response, or end-of-day reporting.
+
+---
+
+## What We're Building
+
+A system where a War Room user clicks **one button** for any of the 5 intelligence pillars and instantly receives a formatted intelligence digest — ready to read, download, or email.
+
+---
+
+## What We Already Have (The NoNews Backend)
+
+Our existing backend already does 70-75% of what War Room needs. Here's the plain-English breakdown:
+
+### Already Built & Working
+
+| Capability | What It Does | War Room Usage |
+|-----------|-------------|----------------|
+| **RSS Feed Ingestion** | Automatically scrapes 12+ news sources every few minutes, extracts article text, stores it | Same sources War Room needs — Stabrook News, Kaieteur News, Guyana Chronicle, etc. |
+| **Sources Table** | Stores all RSS source configs (name, URL, scrape settings) | **Reused as-is** — War Room sources go in the same table. We just add a `platform` column (`'nonews'` or `'warroom'`) so we can query only War Room sources when needed |
+| **Article Deduplication** | Detects and removes duplicate articles across sources | Prevents the same story appearing twice in a digest |
+| **Story Clustering** | Groups related articles into "stories" using AI similarity matching | A story like "Ali announces oil plan" may have 5 articles from different sources — clustering combines them into one story |
+| **Entity Detection** | Identifies people, organizations, and places mentioned in each story | Detects "Irfaan Ali", "APNU+AFC", "Georgetown" etc. — this is how we filter stories per pillar |
+| **AI Summarization** | Generates concise summaries, detailed reports, and debate-style analysis | Reused for digest story summaries |
+| **Quote Extraction** | Pulls direct quotes with speaker attribution from articles | Reused for "Key Quotes" section in each digest |
+| **Semantic Search** | Find stories by meaning, not just keywords | Powers the search bar and "related stories" |
+| **User Authentication** | JWT-based login system via Supabase | Same auth for War Room users |
+| **Rate Limiting & Security** | Input validation, XSS protection, rate limits per user | Protects War Room endpoints |
+
+### NOT Built Yet (What We Need to Add)
+
+| Capability | Why It's Needed | Effort |
+|-----------|----------------|--------|
+| **`platform` column on `sources` table** | Add one column (`'nonews'` / `'warroom'`) so we can filter sources by platform — keeps the existing table untouched otherwise | Tiny |
+| **Pillar Configuration** | Define which entities + sources belong to each of the 5 pillars | Small |
+| **Digest Generation Engine** | The "one click" logic — fetch stories for a pillar, compile the digest | Medium |
+| **Document Export** | Generate downloadable Word (.docx) and PDF files | Medium |
+| **Background Auto-Refresh** | Pre-generate digests every few hours so button click is instant | Small |
+| **Sentiment Analysis** | Classify each story and overall digest tone (positive/neutral/negative) | Small |
+| **Email Delivery** | Send digest as email with PDF/Word attachment | Medium |
+
+---
+
+## How the Existing Pipeline Feeds War Room
+
 ```
+        WHAT WE HAVE                              WHAT WE'RE ADDING
+        (NoNews Backend)                          (War Room Layer)
 
-### Seed Data
-
-```sql
--- Migration: 043_seed_pillar_configs.sql
-
-INSERT INTO pillar_configs (slug, name, description, entity_filters, keywords, sort_order, platform)
-VALUES
-    (
-        'ali-digest',
-        'President Ali',
-        'News, statements, and coverage of the President of Guyana, Irfaan Ali',
-        ARRAY['Irfaan Ali', 'President Ali', 'Dr. Ali', 'Dr. Irfaan Ali', 'Mohamed Irfaan Ali'],
-        ARRAY['president', 'head of state', 'office of the president'],
-        1,
-        'warroom'
-    ),
-    (
-        'jagdeo-digest',
-        'VP Jagdeo',
-        'News, statements, and coverage of Vice President Bharrat Jagdeo',
-        ARRAY['Bharrat Jagdeo', 'VP Jagdeo', 'Vice President Jagdeo', 'Dr. Jagdeo'],
-        ARRAY['vice president', 'VP'],
-        2,
-        'warroom'
-    ),
-    (
-        'azruddin-digest',
-        'Azruddin Mohamed',
-        'Entity-filtered feed tracking political figure Azruddin Mohamed',
-        ARRAY['Azruddin Mohamed', 'Mohamed Azruddin'],
-        ARRAY['Azruddin'],
-        3,
-        'warroom'
-    ),
-    (
-        'opposition-digest',
-        'Opposition',
-        'Aggregated coverage of all opposition channels and figures in Guyana',
-        ARRAY['Aubrey Norton', 'APNU+AFC', 'APNU', 'AFC', 'PNC',
-              'People''s National Congress', 'A Partnership for National Unity',
-              'Alliance for Change', 'Leader of the Opposition',
-              'David Granger', 'Khemraj Ramjattan'],
-        ARRAY['opposition', 'shadow cabinet'],
-        4,
-        'warroom'
-    ),
-    (
-        'live-guyana-digest',
-        'Live Guyana News + International',
-        'Domestic breaking news and foreign coverage of Guyana',
-        ARRAY[]::TEXT[],  -- No entity filter — source-based pillar
-        ARRAY['Guyana', 'Georgetown', 'breaking'],
-        5,
-        'warroom'
-    );
-
--- NOTE: source_ids for 'live-guyana-digest' should be populated after
--- War Room RSS sources are added to the sources table.
--- Run: UPDATE pillar_configs SET source_ids = ARRAY[...] WHERE slug = 'live-guyana-digest';
-
--- NOTE: pillar_embedding should be generated after creation using:
--- generate_profile_embedding(description) from llm_service.py
--- This can be done via a one-time script or admin endpoint.
-```
-
----
-
-## New Table 2: `pillar_digests`
-
-Stores generated digest content for each pillar, per date/time.
-
-```sql
--- Migration: 044_create_pillar_digests.sql
-
-CREATE TABLE IF NOT EXISTS pillar_digests (
-    id BIGSERIAL PRIMARY KEY,
-
-    -- Reference
-    pillar_id INTEGER NOT NULL REFERENCES pillar_configs(id) ON DELETE CASCADE,
-
-    -- Timing & Expiration (Mirroring user_daily_newsletters)
-    edition_date DATE NOT NULL,
-    generated_at TIMESTAMPTZ NULL DEFAULT NOW(),
-    expires_at TIMESTAMPTZ NULL,
-
-    -- Content & Story References
-    summary_story_ids BIGINT[] NOT NULL DEFAULT '{}'::BIGINT[],
-    ai_semantic_story_ids BIGINT[] NOT NULL DEFAULT '{}'::BIGINT[],
-    total_stories_available INTEGER NULL DEFAULT 0,
-
-    -- The actual compiled digest content
-    -- (Replacing cached_llm_summary since digests need structured JSON)
-    content JSONB NOT NULL DEFAULT '{}'::JSONB,
-
-    -- Generation metadata
-    generation_method TEXT NULL DEFAULT 'ai_semantic'::TEXT,
-    generation_time_ms INTEGER,
-
-    -- Status & Errors
-    status TEXT DEFAULT 'active'::TEXT,
-    error_message TEXT,
-
-    -- Timestamps
-    created_at TIMESTAMPTZ NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NULL DEFAULT NOW(),
-
-    CONSTRAINT pillar_digests_multi_unique UNIQUE (pillar_id, edition_date)
-);
-
--- Indexes (Mirroring user_daily_newsletters indexing strategy)
-CREATE INDEX IF NOT EXISTS idx_pillar_digests_generated_at ON pillar_digests USING btree (generated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_pillar_digests_pillar_date ON pillar_digests USING btree (pillar_id, edition_date DESC);
-CREATE INDEX IF NOT EXISTS idx_pillar_digests_date ON pillar_digests USING btree (edition_date DESC);
-CREATE INDEX IF NOT EXISTS idx_pillar_digests_expires ON pillar_digests USING btree (expires_at) WHERE (expires_at IS NOT NULL);
-CREATE INDEX IF NOT EXISTS idx_pillar_digests_status ON pillar_digests USING btree (status) WHERE status = 'active';
-
--- Auto-update timestamp trigger
-CREATE TRIGGER trg_pillar_digests_updated_at
-    BEFORE UPDATE ON pillar_digests
-    FOR EACH ROW
-    EXECUTE FUNCTION trigger_set_timestamp();
-```
-
-
----
-
-## New Table 3: `pillar_source_mapping` (Optional)
-
-If pillars need many-to-many source relationships beyond what `source_ids[]` array provides.
-
-```sql
--- Migration: 045_create_pillar_source_mapping.sql (OPTIONAL)
--- Only needed if source management per pillar becomes complex
-
-CREATE TABLE IF NOT EXISTS pillar_source_mapping (
-    id SERIAL PRIMARY KEY,
-    pillar_id INTEGER NOT NULL REFERENCES pillar_configs(id) ON DELETE CASCADE,
-    source_id INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
-    priority INTEGER DEFAULT 0,            -- Higher = more important for this pillar
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-
-    UNIQUE(pillar_id, source_id)
-);
-
-CREATE INDEX idx_pillar_source_mapping_pillar ON pillar_source_mapping(pillar_id) WHERE is_active = TRUE;
+   ┌─────────────────────┐
+   │  12 Guyana RSS Feeds │
+   │  (Stabrook, Kaieteur,│
+   │   Chronicle, etc.)   │
+   └──────────┬──────────┘
+              ↓
+   ┌─────────────────────┐
+   │  Article Processor   │  Runs automatically
+   │  Scrape → Extract    │  every few minutes
+   │  → Store in database │
+   └──────────┬──────────┘
+              ↓
+   ┌─────────────────────┐
+   │  Story Clustering    │  Groups articles
+   │  AI Similarity +     │  into stories
+   │  Entity Matching     │  (e.g., 5 articles
+   └──────────┬──────────┘   = 1 story)
+              ↓
+   ┌─────────────────────┐
+   │  Stories Database    │
+   │  With entities,      │      ┌──────────────────────────┐
+   │  summaries,          │ ───→ │  NEW: Pillar Filter       │
+   │  source info         │      │  "Give me all stories     │
+   └──────────────────────┘      │   mentioning Irfaan Ali"  │
+                                 └────────────┬─────────────┘
+                                              ↓
+                                 ┌──────────────────────────┐
+                                 │  NEW: Digest Compiler     │
+                                 │  Summaries + Quotes +     │
+                                 │  Sentiment + Formatting   │
+                                 └────────────┬─────────────┘
+                                              ↓
+                                 ┌──────────────────────────┐
+                                 │  NEW: Export Engine       │
+                                 │  → Word document          │
+                                 │  → PDF document           │
+                                 │  → Email delivery         │
+                                 └──────────────────────────┘
 ```
 
 ---
 
-## New RPC Function: `match_stories_for_pillar`
+## The 5 Pillars — How Each One Works
 
-Extends existing `match_stories_for_newsletter` (migration `030`) with source-level filtering.
+Based on the War Room Admin settings, every pillar is essentially a **pre-set filter** on our story database. The critical rule is: **Every pillar pulls from ALL War Room sources**. We do not restrict sources per pillar.
 
-```sql
--- Migration: 046_create_match_stories_for_pillar.sql
+Instead, we filter stories entirely by which **entities** (names or keywords) the system finds in the articles.
 
-CREATE OR REPLACE FUNCTION match_stories_for_pillar(
-    query_embedding vector(768),
-    pillar_entities TEXT[] DEFAULT '{}',
-    pillar_source_ids INTEGER[] DEFAULT '{}',
-    match_threshold FLOAT DEFAULT 0.4,
-    match_count INTEGER DEFAULT 50,
-    hours_back INTEGER DEFAULT 24
-)
-RETURNS TABLE (
-    id INTEGER,
-    title TEXT,
-    summary TEXT,
-    article_count INTEGER,
-    created_at TIMESTAMPTZ,
-    last_article_date TIMESTAMPTZ,
-    similarity FLOAT,
-    entity_match_count INTEGER,
-    matched_entities TEXT[]
-)
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    RETURN QUERY
-    WITH
-    -- Step 1: Semantic similarity search (existing pattern from match_stories_for_newsletter)
-    semantic_matches AS (
-        SELECT
-            s.id,
-            s.title,
-            s.summary,
-            s.article_count,
-            s.created_at,
-            s.last_article_date,
-            1 - (s.centroid_embedding_vec <=> query_embedding) AS similarity
-        FROM stories s
-        WHERE s.status = 'ACTIVE'
-          AND s.last_article_date > NOW() - (hours_back || ' hours')::INTERVAL
-          AND s.centroid_embedding_vec IS NOT NULL
-          AND 1 - (s.centroid_embedding_vec <=> query_embedding) > match_threshold
-        ORDER BY s.centroid_embedding_vec <=> query_embedding
-        LIMIT match_count * 3  -- Overfetch for filtering
-    ),
+Here is the exact mapping to build the 5 Digest buttons based on the War Room UI:
 
-    -- Step 2: Source filter (only if pillar_source_ids is not empty)
-    source_filtered AS (
-        SELECT sm.*
-        FROM semantic_matches sm
-        WHERE
-            -- If no source filter, keep all
-            array_length(pillar_source_ids, 1) IS NULL
-            OR
-            -- Otherwise, check if story has articles from specified sources
-            EXISTS (
-                SELECT 1
-                FROM story_articles sa
-                JOIN artifacts a ON a.id = sa.artifact_id
-                JOIN raw_items ri ON ri.id = a.raw_item_id
-                WHERE sa.story_id = sm.id
-                  AND ri.source_id = ANY(pillar_source_ids)
-            )
-    ),
+| Pillar | Entity / Keyword Filter | Source Filter | Expected Volume |
+|--------|---------------|---------------|-----------------|
+| **1. Live: Guyana** | *Semantic match*: "Domestic Guyana News", "Government", "Local Events" | All sources (`platform = 'warroom'`) | 15-25/day |
+| **2. Foreign: Guyana** | *Semantic match*: "International coverage", "Foreign relations", "Global market" | All sources (`platform = 'warroom'`) | 5-10/day |
+| **3. Opposition: All** | `Aubrey Norton` (person), `APNU+AFC` (party) | All sources (`platform = 'warroom'`) | 5-15/day |
+| **4. Azruddin Mohamed** | `Azruddin Mohamed` (person) | All sources (`platform = 'warroom'`) | 1-5/day |
+| **5. Ali & Jagdeo** | `Irfaan Ali` (person), `Bharrat Jagdeo` (person), `PPP/C` (party) | All sources (`platform = 'warroom'`) | 8-20/day |
 
-    -- Step 3: Entity matching and scoring (existing pattern from reranked function)
-    entity_scored AS (
-        SELECT
-            sf.*,
-            COALESCE(entity_agg.match_count, 0) AS entity_match_count,
-            COALESCE(entity_agg.matched, ARRAY[]::TEXT[]) AS matched_entities
-        FROM source_filtered sf
-        LEFT JOIN LATERAL (
-            SELECT
-                COUNT(*)::INTEGER AS match_count,
-                ARRAY_AGG(DISTINCT se.entity_name) AS matched
-            FROM story_entities se
-            WHERE se.story_id = sf.id
-              AND se.entity_name = ANY(pillar_entities)
-        ) entity_agg ON TRUE
-    )
+### How It Works
 
-    -- Step 4: Final scoring and ranking
-    SELECT
-        es.id,
-        es.title,
-        es.summary,
-        es.article_count,
-        es.created_at,
-        es.last_article_date,
-        -- Combined score: semantic similarity (70%) + entity match bonus (30%)
-        CASE
-            WHEN array_length(pillar_entities, 1) IS NULL OR array_length(pillar_entities, 1) = 0
-            THEN es.similarity  -- No entity filter → pure semantic
-            ELSE es.similarity * 0.7 + LEAST(es.entity_match_count::FLOAT / 3.0, 1.0) * 0.3
-        END AS similarity,
-        es.entity_match_count,
-        es.matched_entities
-    FROM entity_scored es
-    -- For entity-based pillars, require at least one entity match
-    WHERE
-        array_length(pillar_entities, 1) IS NULL
-        OR array_length(pillar_entities, 1) = 0
-        OR es.entity_match_count > 0
-    ORDER BY similarity DESC
-    LIMIT match_count;
-END;
-$$;
+- **Entity-Based (Pillars 3, 4, 5)**: The system finds stories from *any* War Room source where at least one of the listed entity names appears. (e.g., if BBC mentions "Irfaan Ali", it shows up in "Ali & Jagdeo").
+- **Semantic-Based (Pillars 1, 2)**: Since these pillars don't track specific people, they rely on the Postgres `pgvector` semantic AI search to find stories matching the general topic of domestic or international Guyana news.
+- **Always All Sources**: We never restrict a pillar to specific newspapers. If an international paper covers a domestic issue, we want it in the digest.
+
+---
+
+## What a Digest Looks Like
+
+When a user clicks "Ali Digest", they get:
+
+```
+╔══════════════════════════════════════════════╗
+║  WAR ROOM — PRESIDENT ALI DIGEST            ║
+║  March 10, 2026 | 1:15 PM                   ║
+╠══════════════════════════════════════════════╣
+║                                              ║
+║  EXECUTIVE SUMMARY                           ║
+║  Today's coverage of President Ali focuses   ║
+║  on the oil revenue framework announcement   ║
+║  and regional infrastructure plans...        ║
+║                                              ║
+╠══════════════════════════════════════════════╣
+║                                              ║
+║  TOP STORIES (8 stories)                     ║
+║                                              ║
+║  1. President Ali announces new oil          ║
+║     revenue plan                             ║
+║     📰 Stabrook News | ⏰ 2h ago | 5 articles║
+║     Summary: President Irfaan Ali unveiled   ║
+║     a new framework for distributing oil...  ║
+║                                              ║
+║  2. Infrastructure spending targets          ║
+║     announced for Regions 3 and 4            ║
+║     📰 Kaieteur News | ⏰ 4h ago | 3 articles║
+║     Summary: The government outlined new...  ║
+║                                              ║
+║  [... 6 more stories ...]                    ║
+║                                              ║
+╠══════════════════════════════════════════════╣
+║                                              ║
+║  KEY QUOTES                                  ║
+║                                              ║
+║  "This is a historic moment for our nation   ║
+║   and its people."                           ║
+║     — President Irfaan Ali (Stabrook News)   ║
+║                                              ║
+║  "The revenue sharing model ensures every    ║
+║   region benefits equally."                  ║
+║     — Finance Minister (Guyana Chronicle)    ║
+║                                              ║
+╠══════════════════════════════════════════════╣
+║                                              ║
+║  SENTIMENT NOTE                              ║
+║  Overall: POSITIVE                           ║
+║  Coverage is predominantly positive, focused ║
+║  on economic development and infrastructure. ║
+║  Some neutral coverage from opposition-      ║
+║  leaning sources provides balance.           ║
+║                                              ║
+╠══════════════════════════════════════════════╣
+║  📥 Download: [Word] [PDF] | 📧 [Email]     ║
+╚══════════════════════════════════════════════╝
 ```
 
 ---
 
-## Column Addition to `sources` Table (Optional)
+## Delivery Plan
 
-To tag sources with their platform:
+### 🟢 Phase 1 — Foundation
+**Goal**: Database ready, sources connected, pillars configured.
 
-```sql
--- Migration: 047_add_platform_to_sources.sql (OPTIONAL)
+| Task | What Happens |
+|------|-------------|
+| Add `platform` column to existing `sources` table | One `ALTER TABLE` — adds a `platform` column (values: `'nonews'`, `'warroom'`). Existing sources default to `'nonews'`. **No other changes to the sources table.** |
+| Add 12 Guyana RSS feed sources to `sources` table | Stabrook News, Kaieteur News, etc. inserted into the **same existing `sources` table** with `platform = 'warroom'`. The ingestion pipeline picks them up automatically — no worker changes needed. |
+| Create pillar configuration database table | **NEW `pillar_configs` table**. We will run a one-time "seeder" script to manually insert the 5 pillars (names, description, exact entities) just like we do for NoNews `user_newsletters`. |
+| Create digest storage table | Place to store generated digests |
+| Generate AI embeddings for each pillar | The seeder script runs the 5 pillar descriptions through Gemini to generate AI embeddings automatically. |
+| Create story matching function | SQL function (`match_stories_for_pillar`) that finds stories per pillar using semantic + entity matches, mimicking the existing newsletter matcher. |
 
-ALTER TABLE sources ADD COLUMN IF NOT EXISTS platform TEXT DEFAULT 'nonews';
--- Values: 'nonews', 'warroom', 'both'
+**Milestone**: ✅ System can find and return stories for each pillar
 
-CREATE INDEX idx_sources_platform ON sources(platform);
+---
 
--- Tag existing War Room sources after they're added:
--- UPDATE sources SET platform = 'warroom' WHERE name IN ('Stabrook News', 'Kaieteur News', ...);
+### 🟡 Phase 2 — Core Digest Engine
+**Goal**: Can generate a complete digest for any pillar.
+*Technical Note: This service (`digest_service.py`) will be a near 1-to-1 copy of our existing NoNews `newsletter_service.py`. It uses the exact same AI summarization and quote extraction methods, just adapted for the 6 War Room pillars.*
+
+| Task | What Happens |
+|------|-------------|
+| Build digest generation service | Core logic: uses existing NoNews architecture to fetch stories → summarize → extract quotes → compile. Very high code reuse. |
+| Add sentiment analysis AI prompt | New AI prompt classifies tone as positive/neutral/negative |
+| Add digest introduction AI prompt | AI writes 2-3 sentence executive summary per digest |
+| Integrate with existing AI content | Reuse pre-computed summaries and quotes (already in database) |
+
+**Milestone**: ✅ Running a function produces a complete digest JSON with stories, quotes, sentiment
+
+**Performance target**: Each digest generated in under 15 seconds
+
+---
+
+### 🔵 Phase 3 — API & Frontend Integration
+**Goal**: Frontend can call backend and display digests.
+
+| Task | What Happens |
+|------|-------------|
+| Build "List Pillars" endpoint | Frontend calls → gets list of 5 pillars with status |
+| Build "Generate Digest" endpoint | **THE ONE-CLICK BUTTON** — frontend calls → gets full digest |
+| Build "Get Latest Digest" endpoint | Returns pre-generated digest instantly (no wait) |
+| Build "Digest History" endpoint | View past digests by date |
+| Add War Room domain to allowed origins | CORS security — allows War Room frontend to talk to backend |
+
+**Milestone**: ✅ PM can open War Room, click a pillar button, and see a digest
+
+---
+
+### 🟣 Phase 4 — Document Export
+**Goal**: Digests downloadable as Word and PDF.
+
+| Task | What Happens |
+|------|-------------|
+| Build Word (.docx) generator | Converts digest into formatted Word document |
+| Build PDF generator | Converts digest into formatted PDF |
+| Build CSV export | Tabular export of story data |
+| Upload documents to cloud storage | Files stored securely with 24-hour download links |
+| Build "Export" API endpoint | Frontend calls → gets download link |
+
+**Milestone**: ✅ PM can download a professional-looking digest document
+
+**Document format matches**: Header → Executive Summary → Top Stories → Key Quotes → Sentiment Note → Footer
+
+---
+
+### 🟠 Phase 5 — Auto-Refresh
+**Goal**: Digests are always fresh — no waiting when user clicks.
+
+| Task | What Happens |
+|------|-------------|
+| Set up scheduled job (every 3 hours) | System automatically regenerates all 5 pillar digests |
+| Wire refresh endpoint | Scheduled job calls backend → all pillars refresh |
+| Verify instant response | When user clicks button, they get pre-generated digest (< 1 second) |
+
+**Milestone**: ✅ Digests are always pre-generated and ready — one-click feels instant
+
+**Schedule**: Every 3 hours (configurable to 1-6 hours based on need)
+
+---
+
+### 🔴 Phase 6 — Email & Polish
+**Goal**: Full feature set — email delivery, story filtering, refinements.
+
+| Task | What Happens |
+|------|-------------|
+| Set up email service (SendGrid) | Backend can send emails with attachments |
+| Build "Email Digest" endpoint | User enters email → digest sent as PDF/Word attachment |
+| Build story filtering API | Powers the source/entity/tone filter dropdowns in War Room UI |
+| Refine sentiment accuracy | Iterate on AI prompts based on PM feedback |
+| Polish document templates | Refine Word/PDF formatting based on PM/client feedback |
+| End-to-end testing | All flows tested together |
+
+**Milestone**: ✅ All features from the brief are working
+
+---
+
+---
+
+## What the User Experience Looks Like
+
+### Before (Current — from the Brief)
+```
+Step 1: Navigate to correct feed tab
+Step 2: Wait for articles to load
+Step 3: Manually select articles
+Step 4: Click to generate brief
+Step 5: Export or copy output
+→ 5+ minutes per digest, risk of missing stories
+```
+
+### After (With Digest Engine)
+```
+Step 1: Click "Ali Digest" button
+→ Digest appears instantly (pre-generated)
+→ Click "Download PDF" or "Email"
+→ Done in under 10 seconds
 ```
 
 ---
 
-## Migration Execution Order
+## Key Decisions for PM to Confirm
 
-```
-042_create_pillar_configs.sql          -- Pillar configuration table
-043_seed_pillar_configs.sql            -- Initial 5 pillars
-044_create_pillar_digests.sql          -- Digest storage
-045_create_pillar_source_mapping.sql   -- Optional: source ↔ pillar mapping
-046_create_match_stories_for_pillar.sql -- RPC for pillar story matching
-047_add_platform_to_sources.sql        -- Optional: platform tagging
-```
+### 1. Pillar Names & Structure (Confirmed)
+
+| # | Pillar Name | Sidebar Label (from UI) | Type |
+|---|-------------|------------------------|------|
+| 1 | Live: Guyana | Live: Guyana | Semantic-based (all domestic news) |
+| 2 | Foreign: Guyana | Foreign: Guyana | Semantic-based (international coverage) |
+| 3 | Opposition: All | Opposition: All | Entity-based (Norton, APNU+AFC) |
+| 4 | Azruddin Mohamed | Azruddin Mohamed | Entity-based |
+| 5 | Ali & Jagdeo | Ali & Jagdeo | Entity-based (Ali, Jagdeo, PPP/C) |
+
+### 2. Refresh Frequency
+- Brief says "1-6 hours"
+- **Recommendation**: Start with every 3 hours, adjust based on how fast Guyana news moves
+- Can be changed without code changes (just update the schedule)
+
+### 3. Max Stories Per Digest
+- Brief says "5-10 most recent and relevant"
+- **Recommendation**: Default 10, configurable per pillar
+- Azruddin (lower volume) might only have 2-3 some days — that's OK
+
+### 4. Email Provider
+- **Option A**: SendGrid — easier setup, good deliverability
+- **Option B**: Amazon SES — cheaper at scale
+- **Recommendation**: SendGrid (faster to integrate, can switch later)
+
+### 5. Social Listening & Civic Portal
+- These are visible in the War Room sidebar but are **out of scope** for this plan
+- Social Listening = Facebook monitoring (needs Facebook API — separate project)
+- Civic Portal = separate platform tab entirely
 
 ---
 
-## Post-Migration Steps
+## Success Metrics
 
-1. **Add War Room RSS sources** to `sources` table (if not already present)
-2. **Generate pillar embeddings** by running `generate_profile_embedding(description)` for each pillar
-3. **Set `source_ids`** on `live-guyana-digest` pillar after sources are created
-4. **Verify** `match_stories_for_pillar` returns results with test queries
+| Metric | Target | How We Measure |
+|--------|--------|----------------|
+| Time to get a digest | < 10 seconds (click to read) | Pre-generated digests served in < 1 second |
+| Digest relevance | 90%+ of stories are on-topic for the pillar | PM spot-checks 5 digests daily for first week |
+| Story coverage | No major story missed | Compare digest against manual news scan |
+| Sentiment accuracy | 80%+ correct classifications | PM reviews sample of 20 stories |
+| Document quality | Professional, ready to share | PM approves template before launch |
+| Uptime | 99%+ | Cloud monitoring alerts |
+| Export success rate | 99%+ | Error logs |
 
 ---
 
-## Existing Tables Used (No Changes Needed)
+## Risks & Mitigations
 
-| Table | Usage in War Room |
-|---|---|
-| `sources` | Store War Room RSS feed URLs |
-| `raw_items` | Ingested articles |
-| `artifacts` | Processed articles with embeddings |
-| `stories` | Clustered story groups |
-| `story_articles` | Story ↔ article junction |
-| `story_entities` | Extracted entities per story |
-| `story_categories` | Category assignments |
-| `story_ai_content` | LLM-generated content (quotes, reports, etc.) |
+| Risk | Likelihood | Impact | What We Do |
+|------|-----------|--------|-----------|
+| RSS feed URL changes or breaks | Medium | No new articles from that source | Monitoring alerts when a source hasn't published in 6+ hours |
+| AI gives wrong sentiment | Medium | Misleading digest tone | Human review during Phase 6; iterate on AI prompts |
+| Entity name spelled differently in articles | Medium | Stories missed for a pillar | Include multiple aliases (e.g., "Irfaan Ali" + "President Ali" + "Dr. Ali") |
+| Digest generation takes too long | Low | User waits instead of instant click | Background pre-generation every 3 hours eliminates wait |
+| Low story volume for some pillars | Medium | Azruddin digest might be empty some days | Show "No stories in the last 24 hours" message — not an error |
+| Document formatting issues | Low | PDF/Word looks bad | Test with real Guyanese content (proper nouns, special chars) early |
+
+---
+
+## Team Requirements
+
+| Role | Needed For | Phases |
+|------|-----------|--------|
+| **Backend Engineer** (Senior) | Database, digest engine, API endpoints, export, email | All phases |
+| **Frontend Engineer** | Connect War Room UI to new API endpoints | Phase 3 onward |
+| **PM** | Validate pillar configs, review digest quality, approve document templates | Phase 1 decisions + Phase 3-6 validation |
+| **DevOps** (part-time) | Cloud Scheduler setup, GCS bucket, environment variables | Phase 1 + Phase 5 |
+
+---
+
+## Budget Considerations
+
+| Item | Cost | Notes |
+|------|------|-------|
+| AI API calls (OpenRouter/Gemini) | ~$5-15/day | 5 pillars × 3-5 LLM calls per refresh × 8 refreshes/day |
+| Cloud Functions compute | Existing budget | No new functions needed — extends existing API service |
+| Cloud Storage (exports) | < $1/month | Documents auto-deleted after 30 days |
+| SendGrid (email) | Free tier: 100 emails/day | Upgrade to $20/month for higher volume |
+| Cloud Scheduler | Free | 3 jobs/month included free |
+
+**Total estimated additional cost: $150-500/month** depending on usage volume.
+
+---
+
+## Appendix: Detailed Technical Docs
+
+For the implementing engineer, these companion documents in `/warroom/` contain code-level details:
+
+| Doc | What's Inside |
+|-----|--------------|
+| `EXECUTION_PLAN.md` | Line-by-line engineering execution plan with file paths and code patterns |
+| `01_BACKEND_REUSE_MAP.md` | Component-by-component reuse analysis |
+| `02_PILLAR_NEWSLETTER_MAPPING.md` | How pillars map to the newsletter system |
+| `03_NEW_TABLES_AND_MIGRATIONS.md` | Full SQL for new database tables |
+| `04_API_ENDPOINTS.md` | API endpoint specs with request/response schemas |
+| `05_DIGEST_GENERATION_ENGINE.md` | Digest engine architecture and AI prompts |
+| `06_DOCUMENT_EXPORT.md` | Word/PDF/email implementation details |
+| `07_IMPLEMENTATION_PHASES.md` | Sprint breakdown with file change lists |
+| `08_SOURCES_AND_ENTITIES.md` | Source URLs and entity alias mapping |
