@@ -49,10 +49,10 @@ These are the news sources visible in the War Room UI (Domestic Guyana + Interna
 ### Database Insert Format
 
 ```sql
--- Example: Add Stabrook News
+-- Example: Add Stabroek News
 INSERT INTO sources (name, source_type, description, config, active, platform)
 VALUES (
-    'Stabrook News',
+    'Stabroek News',
     'rss',
     'Guyana domestic news source',
     '{"rss_url": "https://www.stabroeknews.com/feed/", "scrape_content": true}'::jsonb,
@@ -65,18 +65,29 @@ VALUES (
 
 | Source | Pillar 1 (Ali) | Pillar 2 (Jagdeo) | Pillar 3 (Azruddin) | Pillar 4 (Opposition) | Pillar 5 (Live+Intl) |
 |--------|:-:|:-:|:-:|:-:|:-:|
-| Stabrook News | via entity | via entity | via entity | via entity | YES |
+| Stabroek News | via entity | via entity | via entity | via entity | YES |
 | Kaieteur News | via entity | via entity | via entity | via entity | YES |
 | Guyana Chronicle | via entity | via entity | via entity | via entity | YES |
 | Demerara Waves | via entity | via entity | via entity | via entity | YES |
 | News Room GY | via entity | via entity | via entity | via entity | YES |
 | Guyana Times | via entity | via entity | via entity | via entity | YES |
 | Conversation Tree | via entity | via entity | via entity | via entity | YES |
-| Guyana News & Info | via entity | via entity | via entity | via entity | YES |
+| Guyana News & Information | via entity | via entity | via entity | via entity | YES |
 | DPI Guyana | via entity | via entity | via entity | via entity | YES |
 | Guyana Defence Force | via entity | via entity | via entity | via entity | YES |
-| Guyana Revenue Auth | via entity | via entity | via entity | via entity | YES |
+| Guyana Revenue Authority (GRA) | via entity | via entity | via entity | via entity | YES |
 | Caribbean360 | via entity | via entity | via entity | via entity | YES (Intl) |
+| Caribbean National Weekly | via entity | via entity | via entity | via entity | YES (Intl) |
+| Jamaica Gleaner | via entity | via entity | via entity | via entity | YES (Intl) |
+| T&T Guardian | via entity | via entity | via entity | via entity | YES (Intl) |
+| Reuters | via entity | via entity | via entity | via entity | YES (Intl) |
+| BBC News | via entity | via entity | via entity | via entity | YES (Intl) |
+| Al Jazeera | via entity | via entity | via entity | via entity | YES (Intl) |
+| The Guardian | via entity | via entity | via entity | via entity | YES (Intl) |
+| NYT Americas | via entity | via entity | via entity | via entity | YES (Intl) |
+| OilNow | via entity | via entity | via entity | via entity | YES (Intl) |
+| Offshore Energy | via entity | via entity | via entity | via entity | YES (Intl) |
+| Energy Voice | via entity | via entity | via entity | via entity | YES (Intl) |
 
 **Key**:
 - "via entity" = articles from this source are included if they mention the pillar's entities
@@ -159,19 +170,20 @@ The `match_stories_for_pillar` RPC checks `story_entities.entity_name = ANY(pill
 
 ## Live Feed Counts (from UI Screenshots)
 
-The UI shows article counts per source feed:
+The UI shows article counts per source feed (Domestic Guyana):
 
 | Source | Count (at time of screenshot) |
 |--------|------|
-| Stabrook News | 25 |
+| Stabroek News | 25 |
 | Kaieteur News | 25 |
-| Guyana Times | 10 |
-| Dept. of Public Information (DPI) | 5 |
-| Conversation Tree | 10 |
-| News Room Guyana | 10 |
 | Guyana Chronicle | 10 |
+| News Room Guyana | 10 |
 | Guyana Revenue Authority (GRA) | 10 |
-| Guyana Defence Force | visible |
+| Dept. of Public Information (DPI) | 5 |
+| Guyana News & Information | 5 |
+| Conversation Tree | 10 |
+
+International/regional sources (Caribbean360, Reuters, BBC, etc.) appear in the "All Sources" filter for Foreign: Guyana and are included in the full source list above.
 
 This indicates active RSS feeds with regular publishing — good signal that the ingestion pipeline will have steady input.
 
@@ -205,14 +217,16 @@ The War Room UI toolbar shows: `CSV | EMAIL | BRIEF | NARRATIVES`
 
 ## Data Volume Estimates
 
-Based on 12 sources publishing ~10-25 articles each per day:
+Based on 23 sources (12 domestic Guyana + 11 international/regional) publishing ~10-25 articles each per day for domestic, variable for international:
 
 | Metric | Estimate |
 |--------|----------|
-| Articles/day | 120-300 |
-| Stories/day (after clustering) | 30-80 |
+| Domestic sources | 12 (Stabroek, Kaieteur, Chronicle, etc.) |
+| International sources | 11 (Caribbean360, Reuters, BBC, OilNow, etc.) |
+| Articles/day | 200-500+ |
+| Stories/day (after clustering) | 50-120 |
 | Stories per pillar digest | 5-15 |
 | Entities per story | 3-8 |
-| Storage per day | ~5-10 MB (articles in GCS) |
+| Storage per day | ~8-15 MB (articles in GCS) |
 
 This is well within the existing system's capacity (designed for thousands of articles/day).
