@@ -64,7 +64,7 @@ The HuggingFace model (`BAAI/bge-large-en-v1.5`) is ~1.3 GB. On the first run it
 
 ---
 
-## Step 3: CSV File Reading (`excel_parser.py`)
+## Step 3: CSV File Reading + Header Auto-Detection (`excel_parser.py`)
 
 The `ExcelParser` opens your file and reads it into a pandas DataFrame:
 
@@ -76,20 +76,26 @@ parsed_excel = self.excel_parser.parse_excel_file(file_path)
 1. Detects the file extension (`.csv`, `.xlsx`, `.xls`)
 2. For CSV files → uses `pd.read_csv()` with `header=None` (treats ALL rows as data)
 3. Cleans the DataFrame (strips whitespace, removes fully empty rows/columns)
-4. Computes a SHA-256 hash of the file contents (for deduplication)
-5. Returns a `ParsedExcel` object containing the DataFrame(s)
+4. **Auto-detects the header row** — scans first 5 rows for known curriculum keywords (`topic`, `concept`, `subject`, `skill_name`, `unit`, `grade_label`, etc.). If a row contains ≥2 keyword matches, it gets promoted to column names and removed from data.
+5. Computes a SHA-256 hash of the file contents (for deduplication)
+6. Returns a `ParsedExcel` object containing the DataFrame(s) with **proper string column names**
 
-**Important quirk:** Because the parser reads with `header=None`, the column names are just **integers** (0, 1, 2, 3...) and the actual header row ("subject", "topic", etc.) is sitting in row 0 as regular data. The orchestrator fixes this later in Step 5.
+**Header auto-detection example:**
+The parser reads the raw CSV with integer columns (0, 1, 2, 3), then scans row 0:
+```python
+row_vals = ["subject", "unit", "topic", "concept"]  # 4 keyword matches (≥2) → header!
+df.columns = ["subject", "unit", "topic", "concept"]  # Promoted to column names
+df = df.iloc[1:]  # Row 0 removed from data
+```
 
 **Example — what the DataFrame looks like after this step:**
 
-| 0 | 1 | 2 | 3 |
-|---|---|---|---|
 | subject | unit | topic | concept |
+|---------|------|-------|---------|
 | Mathematics | Algebra | Linear Equations | Solve for X |
 | Mathematics | Geometry | Shapes | Identify squares |
 
-*(Column names are 0, 1, 2, 3 — not the actual headers yet!)*
+*(Column names are already proper strings — the orchestrator doesn't need to fix them!)*
 
 ---
 
@@ -121,21 +127,13 @@ The returned `doc_id` (e.g., 3) becomes the foreign key that links every curricu
 
 ---
 
-## Step 5: Header Detection & Column Mapping (`orchestrator.py`)
+## Step 5: Column Mapping (`orchestrator.py`)
 
-This is the most critical step. The orchestrator needs to figure out which DataFrame column holds the "topic", which holds the "concept", etc.
+The orchestrator needs to figure out which DataFrame column holds the "topic", which holds the "concept", etc. Since `excel_parser.py` already auto-detected the header row (Step 3), the DataFrame arrives with proper lowercase string column names.
 
 ### For Generic mode (`--file`):
 
-**5a. Fix the header row:**
-```python
-# If columns are integers (0, 1, 2...), the real header is in row 0
-if all(isinstance(c, (int, float)) for c in df.columns):
-    df.columns = [str(c).strip().lower() for c in df.iloc[0]]  # Row 0 becomes headers
-    df = df.iloc[1:].reset_index(drop=True)                     # Remove row 0 from data
-```
-
-After this fix, the DataFrame looks correct:
+The orchestrator normalises column names for safety, then resolves the mapping:
 
 | subject | unit | topic | concept |
 |---------|------|-------|---------|
@@ -325,15 +323,14 @@ User types: pipenv run python main.py run --subject math --file data.csv
 3. orchestrator.py  → run_pipeline()      # Connects to DBs, loads model
 4. orchestrator.py  → _run_ingestion_stage()   # Loop over targets
 5. orchestrator.py  → _ingest_target()         # Parse one CSV file
-6. excel_parser.py  → parse_excel_file()       # Read CSV into DataFrame
+6. excel_parser.py  → parse_excel_file()       # Read CSV + auto-detect headers
 7. raw_data_store.py → store_source_document() # Register file in PG
 8. orchestrator.py  → _ingest_csv_to_curriculum_items()  # The big function
-   ├── 8a. Fix integer column headers
-   ├── 8b. _resolve_column_map()          # Map CSV columns to internal fields
-   ├── 8c. Loop rows → extract values     # Build all_rows list
-   ├── 8d. Deduplication check            # Skip already-embedded rows
-   ├── 8e. embedding_service.embed_texts() # Generate vectors (HuggingFace)
-   └── 8f. embedding_store.store_curriculum_items_batch()  # Bulk insert to PG
+   ├── 8a. _resolve_column_map()          # Map CSV columns to internal fields
+   ├── 8b. Loop rows → extract values     # Build all_rows list
+   ├── 8c. Deduplication check            # Skip already-embedded rows
+   ├── 8d. embedding_service.embed_texts() # Generate vectors (HuggingFace)
+   └── 8e. embedding_store.store_curriculum_items_batch()  # Bulk insert to PG
 ```
 
 ---
