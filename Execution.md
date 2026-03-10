@@ -111,6 +111,7 @@ Our existing backend already does 70-75% of what War Room needs. Here's the plai
 | Capability | What It Does | War Room Usage |
 |-----------|-------------|----------------|
 | **RSS Feed Ingestion** | Automatically scrapes 12+ news sources every few minutes, extracts article text, stores it | Same sources War Room needs — Stabrook News, Kaieteur News, Guyana Chronicle, etc. |
+| **Sources Table** | Stores all RSS source configs (name, URL, scrape settings) | **Reused as-is** — War Room sources go in the same table. We just add a `platform` column (`'nonews'` or `'warroom'`) so we can query only War Room sources when needed |
 | **Article Deduplication** | Detects and removes duplicate articles across sources | Prevents the same story appearing twice in a digest |
 | **Story Clustering** | Groups related articles into "stories" using AI similarity matching | A story like "Ali announces oil plan" may have 5 articles from different sources — clustering combines them into one story |
 | **Entity Detection** | Identifies people, organizations, and places mentioned in each story | Detects "Irfaan Ali", "APNU+AFC", "Georgetown" etc. — this is how we filter stories per pillar |
@@ -124,13 +125,13 @@ Our existing backend already does 70-75% of what War Room needs. Here's the plai
 
 | Capability | Why It's Needed | Effort |
 |-----------|----------------|--------|
+| **`platform` column on `sources` table** | Add one column (`'nonews'` / `'warroom'`) so we can filter sources by platform — keeps the existing table untouched otherwise | Tiny |
 | **Pillar Configuration** | Define which entities + sources belong to each of the 5 pillars | Small |
 | **Digest Generation Engine** | The "one click" logic — fetch stories for a pillar, compile the digest | Medium |
 | **Document Export** | Generate downloadable Word (.docx) and PDF files | Medium |
 | **Background Auto-Refresh** | Pre-generate digests every few hours so button click is instant | Small |
 | **Sentiment Analysis** | Classify each story and overall digest tone (positive/neutral/negative) | Small |
 | **Email Delivery** | Send digest as email with PDF/Word attachment | Medium |
-| **Source-Based Filtering** | Filter stories by which news source published them (needed for Pillar 5) | Small |
 
 ---
 
@@ -280,9 +281,10 @@ When a user clicks "Ali Digest", they get:
 
 | Task | What Happens | Who Validates |
 |------|-------------|---------------|
+| Add `platform` column to existing `sources` table | One `ALTER TABLE` — adds a `platform` column (values: `'nonews'`, `'warroom'`). Existing sources default to `'nonews'`. **No other changes to the sources table.** | Engineer runs `SELECT platform FROM sources` and confirms column exists |
+| Add 12 Guyana RSS feed sources to `sources` table | Stabrook News, Kaieteur News, etc. inserted into the **same existing `sources` table** with `platform = 'warroom'`. The ingestion pipeline picks them up automatically — no worker changes needed. | PM verifies source names match War Room UI |
 | Create pillar configuration database table | 5 pillars stored with their entity filters and settings | Engineer runs query, confirms 5 pillars exist |
 | Create digest storage table | Place to store generated digests | Engineer confirms table created |
-| Add 12 Guyana RSS feed sources | Stabrook News, Kaieteur News, etc. added to system | PM verifies source names match War Room UI |
 | Generate AI embeddings for each pillar | System learns what each pillar "means" semantically | Engineer confirms all 5 have embeddings |
 | Create story matching function | SQL function that finds stories per pillar | Engineer tests: "ali-digest" returns Ali-related stories |
 
