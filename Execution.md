@@ -185,32 +185,33 @@ Our existing backend already does 70-75% of what War Room needs. Here's the plai
 
 ## The 5 Pillars — How Each One Works
 
-Every pillar is essentially a **pre-set filter** on our story database:
+Every pillar is essentially a **pre-set filter** on our story database. Each pillar needs a defined list of **entities** (names the system looks for in stories) and **sources** (which news outlets to pull from).
 
-### Pillar 1: President Ali
-- **Filter**: Show stories where entities include "Irfaan Ali", "President Ali", or "Dr. Ali"
-- **Sources**: All — any source that mentions him
-- **Expected volume**: 5-15 stories per day
+> [!IMPORTANT]
+> **PM Action Required**: The entity-to-pillar mapping below is a **proposed mapping** based on the brief descriptions and War Room UI screenshots. The PM must review and confirm/edit these before implementation begins. If any entity names or aliases are wrong or missing, the pillar will miss stories or pick up irrelevant ones.
 
-### Pillar 2: VP Jagdeo
-- **Filter**: Show stories where entities include "Bharrat Jagdeo", "VP Jagdeo"
-- **Sources**: All
-- **Expected volume**: 3-10 stories per day
+### Proposed Entity Mapping Per Pillar
 
-### Pillar 3: Azruddin Mohamed
-- **Filter**: Show stories where entities include "Azruddin Mohamed"
-- **Sources**: All
-- **Expected volume**: 1-5 stories per day (lower volume)
+| Pillar | Entity Names (what the system searches for in stories) | Sources | Est. Volume |
+|--------|-------------------------------------------------------|---------|-------------|
+| **1. President Ali** | `Irfaan Ali`, `President Ali`, `Dr. Ali`, `Dr. Irfaan Ali`, `Mohamed Irfaan Ali` | All sources (entity-based filter) | 5-15/day |
+| **2. VP Jagdeo** | `Bharrat Jagdeo`, `VP Jagdeo`, `Vice President Jagdeo`, `Dr. Jagdeo` | All sources (entity-based filter) | 3-10/day |
+| **3. Azruddin Mohamed** | `Azruddin Mohamed`, `Mohamed Azruddin` | All sources (entity-based filter) | 1-5/day |
+| **4. Opposition** | `Aubrey Norton`, `APNU+AFC`, `APNU`, `AFC`, `PNC`, `People's National Congress`, `A Partnership for National Unity`, `Alliance for Change`, `Leader of the Opposition`, `David Granger`, `Khemraj Ramjattan` | All sources (entity-based filter) | 5-15/day |
+| **5. Live Guyana + Intl** | _(none — this pillar is source-based, not entity-based)_ | All War Room sources (`platform = 'warroom'`) | 20-40/day |
 
-### Pillar 4: Opposition
-- **Filter**: Show stories mentioning "Aubrey Norton", "APNU+AFC", "APNU", "AFC", "PNC"
-- **Sources**: All
-- **Expected volume**: 5-15 stories per day
+### How It Works
 
-### Pillar 5: Live Guyana + International
-- **Filter**: NOT entity-based — instead filters by **source** (all domestic + international outlets)
-- **Sources**: All 12+ configured sources
-- **Expected volume**: 20-40 stories per day (highest volume)
+- **Pillars 1-4** (entity-based): The system finds stories where **any** of the listed entity names appear. If an article mentions "President Ali" or "Dr. Irfaan Ali", it shows up in the Ali digest. More aliases = better coverage, fewer missed stories.
+- **Pillar 5** (source-based): No entity filter — it simply shows **all stories** from War Room sources. This is the broadest feed.
+
+### Questions for PM to Confirm
+
+1. **Are the entity aliases correct?** For example, is President Ali also referred to as "Head of State" or any other title in Guyanese media?
+2. **Opposition pillar**: Should `David Granger` and `Khemraj Ramjattan` be included, or only current active opposition figures?
+3. **Azruddin Mohamed**: Are there other spellings or titles used for this person?
+4. **Ali & Jagdeo combined view**: The UI sidebar shows "Ali & Jagdeo" together — should they remain as 2 separate pillars (recommended) or be merged into one?
+5. **Live Guyana vs Foreign**: The UI shows these as 2 sidebar items — should they be 1 pillar or 2 separate pillars?
 
 ---
 
