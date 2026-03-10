@@ -185,14 +185,16 @@ Our existing backend already does 70-75% of what War Room needs. Here's the plai
 
 ## The 6 Pillars — How Each One Works
 
-Based on the War Room Admin settings, every pillar is essentially a **pre-set filter** on our story database. They use specific lists of **entities** (names the system looks for) and **sources** (which news outlets to pull from).
+Based on the War Room Admin settings, every pillar is essentially a **pre-set filter** on our story database. The critical rule is: **Every pillar pulls from ALL War Room sources**. We do not restrict sources per pillar.
+
+Instead, we filter stories entirely by which **entities** (names or keywords) the system finds in the articles.
 
 Here is the exact mapping to build the 6 Digest buttons based on the War Room UI:
 
-| Pillar | Entity Filter | Source Filter | Expected Volume |
+| Pillar | Entity / Keyword Filter | Source Filter | Expected Volume |
 |--------|---------------|---------------|-----------------|
-| **1. Live: Guyana** | _(None)_ | ONLY tags `domestic`, `energy` (Stabroek News, Kaieteur News, Guyana Chronicle, OilNow) | 15-25/day |
-| **2. Foreign: Guyana** | _(None)_ | ONLY tags `international`, `caribbean` (Reuters, BBC, NYT, T&T Guardian, etc.) | 5-10/day |
+| **1. Live: Guyana** | *Semantic match*: "Domestic Guyana News", "Government", "Local Events" | All sources (`platform = 'warroom'`) | 15-25/day |
+| **2. Foreign: Guyana** | *Semantic match*: "International coverage", "Foreign relations", "Global market" | All sources (`platform = 'warroom'`) | 5-10/day |
 | **3. Opposition: All** | `Aubrey Norton` (person), `APNU+AFC` (party) | All sources (`platform = 'warroom'`) | 5-15/day |
 | **4. Azruddin Mohamed** | `Azruddin Mohamed` (person) | All sources (`platform = 'warroom'`) | 1-5/day |
 | **5. Ali & Jagdeo** | `Irfaan Ali` (person), `Bharrat Jagdeo` (person), `PPP/C` (party) | All sources (`platform = 'warroom'`) | 8-20/day |
@@ -200,9 +202,9 @@ Here is the exact mapping to build the 6 Digest buttons based on the War Room UI
 
 ### How It Works
 
-- **Entity-Based (Pillars 3, 4, 5, 6)**: The system finds stories from *any* War Room source where at least one of the listed entity names appears. (e.g., if BBC mentions "Irfaan Ali", it shows up in Pillar 5).
-- **Source-Based (Pillars 1, 2)**: The system finds *all* stories published by those specific sources, regardless of who they mention, effectively creating a dedicated "Domestic" feed and an "International" feed.
-- **Combined Views**: The API allows combining multiple entities (like `Irfaan Ali` + `Bharrat Jagdeo` + `PPP/C`) into a single "Ali & Jagdeo" digest to match the UI sidebar exactly.
+- **Entity-Based (Pillars 3, 4, 5, 6)**: The system finds stories from *any* War Room source where at least one of the listed entity names appears. (e.g., if BBC mentions "Irfaan Ali", it shows up in "Ali & Jagdeo").
+- **Semantic-Based (Pillars 1, 2)**: Since these pillars don't track specific people, they rely on the Postgres `pgvector` semantic AI search to find stories matching the general topic of domestic or international Guyana news.
+- **Always All Sources**: We never restrict a pillar to specific newspapers. If an international paper covers a domestic issue, we want it in the digest.
 
 ---
 
@@ -275,10 +277,10 @@ When a user clicks "Ali Digest", they get:
 |------|-------------|---------------|
 | Add `platform` column to existing `sources` table | One `ALTER TABLE` — adds a `platform` column (values: `'nonews'`, `'warroom'`). Existing sources default to `'nonews'`. **No other changes to the sources table.** | Engineer runs `SELECT platform FROM sources` and confirms column exists |
 | Add 12 Guyana RSS feed sources to `sources` table | Stabrook News, Kaieteur News, etc. inserted into the **same existing `sources` table** with `platform = 'warroom'`. The ingestion pipeline picks them up automatically — no worker changes needed. | PM verifies source names match War Room UI |
-| Create pillar configuration database table | 5 pillars stored with their entity filters and settings | Engineer runs query, confirms 5 pillars exist |
+| Create pillar configuration database table | **NEW `pillar_configs` table**. We will run a one-time "seeder" script to manually insert the 6 pillars (names, description, exact entities) just like we do for NoNews `user_newsletters`. | Engineer runs query, confirms 6 pillars exist |
 | Create digest storage table | Place to store generated digests | Engineer confirms table created |
-| Generate AI embeddings for each pillar | System learns what each pillar "means" semantically | Engineer confirms all 5 have embeddings |
-| Create story matching function | SQL function that finds stories per pillar | Engineer tests: "ali-digest" returns Ali-related stories |
+| Generate AI embeddings for each pillar | The seeder script runs the 6 pillar descriptions through Gemini to generate AI embeddings automatically. | Engineer confirms all 6 have embeddings |
+| Create story matching function | SQL function (`match_stories_for_pillar`) that finds stories per pillar using semantic + entity matches, mimicking the existing newsletter matcher. | Engineer tests: "ali-digest" returns Ali-related stories |
 
 **Milestone**: ✅ System can find and return stories for each pillar
 
@@ -286,10 +288,11 @@ When a user clicks "Ali Digest", they get:
 
 ### 🟡 Phase 2 — Core Digest Engine (Days 4-7)
 **Goal**: Can generate a complete digest for any pillar.
+*Technical Note: This service (`digest_service.py`) will be a near 1-to-1 copy of our existing NoNews `newsletter_service.py`. It uses the exact same AI summarization and quote extraction methods, just adapted for the 6 War Room pillars.*
 
 | Task | What Happens | Who Validates |
 |------|-------------|---------------|
-| Build digest generation service | Core logic: fetch stories → summarize → extract quotes → analyze sentiment → compile | Engineer tests all 5 pillars |
+| Build digest generation service | Core logic: uses existing NoNews architecture to fetch stories → summarize → extract quotes → compile. Very high code reuse. | Engineer tests all 6 pillars |
 | Add sentiment analysis AI prompt | New AI prompt classifies tone as positive/neutral/negative | PM reviews sentiment accuracy on 10 sample stories |
 | Add digest introduction AI prompt | AI writes 2-3 sentence executive summary per digest | PM reviews quality of introductions |
 | Integrate with existing AI content | Reuse pre-computed summaries and quotes (already in database) | Engineer confirms no duplicate AI calls |
