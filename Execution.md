@@ -1,232 +1,245 @@
-# 08 — Sources & Entities Mapping
+# 01 — Backend Reuse Map
 
-> Complete mapping of War Room sources and entities from the UI screenshots to existing database structures.
-
----
-
-## Sources (from War Room "All Sources" Dropdown)
-
-These are the news sources visible in the War Room UI (Domestic Guyana + International). Each needs a row in the `sources` table.
-
-### Domestic Guyana (Live: Guyana)
-
-| # | Source Name | Type | RSS URL (to be configured) | Status |
-|---|------------|------|---------------------------|--------|
-| 1 | Stabroek News | RSS | `https://www.stabroeknews.com/feed/` | Needs verification |
-| 2 | Kaieteur News | RSS | `https://www.kaieteurnewsonline.com/feed/` | Needs verification |
-| 3 | Guyana Chronicle | RSS | `https://guyanachronicle.com/feed/` | Needs verification |
-| 4 | Demerara Waves | RSS | `https://demerarawaves.com/feed/` | Needs verification |
-| 5 | News Room GY | RSS | `https://newsroom.gy/feed/` | Needs verification |
-| 6 | Guyana Times | RSS | `https://guyanatimesgy.com/feed/` | Needs verification |
-| 7 | Conversation Tree | RSS | TBD | Needs research |
-| 8 | Guyana News & Information | RSS | TBD | Needs research |
-| 9 | DPI Guyana (Dept. of Public Information) | RSS | `https://dpi.gov.gy/feed/` | Needs verification |
-| 10 | Guyana Defence Force | RSS | TBD | Needs research |
-| 11 | Guyana Revenue Authority (GRA) | RSS | TBD | Needs research (may not have RSS) |
-| 12 | Caribbean360 | RSS | `https://www.caribbean360.com/feed` | Needs verification |
-
-### International & Regional (Foreign: Guyana / broader coverage)
-
-| # | Source Name | Type | RSS URL (to be configured) | Status |
-|---|------------|------|---------------------------|--------|
-| 13 | Caribbean National Weekly | RSS | TBD | Needs research |
-| 14 | Jamaica Gleaner | RSS | TBD | Needs research |
-| 15 | T&T Guardian | RSS | TBD | Needs research |
-| 16 | Reuters | RSS | TBD | Needs research |
-| 17 | BBC News | RSS | TBD | Needs research |
-| 18 | Al Jazeera | RSS | TBD | Needs research |
-| 19 | The Guardian | RSS | TBD | Needs research |
-| 20 | NYT Americas | RSS | TBD | Needs research |
-| 21 | OilNow | RSS | TBD | Needs research |
-| 22 | Offshore Energy | RSS | TBD | Needs research |
-| 23 | Energy Voice | RSS | TBD | Needs research |
-
-### Notes
-- All RSS URLs need verification — some sites may have changed feed URLs
-- Sources without RSS may need web scraping (the `news_article_processor_worker` supports this via `source_type` config)
-- The existing worker handles rate limiting (500ms between requests to same domain)
-
-### Database Insert Format
-
-```sql
--- Example: Add Stabroek News
-INSERT INTO sources (name, source_type, description, config, active, platform)
-VALUES (
-    'Stabroek News',
-    'rss',
-    'Guyana domestic news source',
-    '{"rss_url": "https://www.stabroeknews.com/feed/", "scrape_content": true}'::jsonb,
-    true,
-    'warroom'
-);
-```
-
-### Source → Pillar Mapping
-
-| Source | Pillar 1 (Ali) | Pillar 2 (Jagdeo) | Pillar 3 (Azruddin) | Pillar 4 (Opposition) | Pillar 5 (Live+Intl) |
-|--------|:-:|:-:|:-:|:-:|:-:|
-| Stabroek News | via entity | via entity | via entity | via entity | YES |
-| Kaieteur News | via entity | via entity | via entity | via entity | YES |
-| Guyana Chronicle | via entity | via entity | via entity | via entity | YES |
-| Demerara Waves | via entity | via entity | via entity | via entity | YES |
-| News Room GY | via entity | via entity | via entity | via entity | YES |
-| Guyana Times | via entity | via entity | via entity | via entity | YES |
-| Conversation Tree | via entity | via entity | via entity | via entity | YES |
-| Guyana News & Information | via entity | via entity | via entity | via entity | YES |
-| DPI Guyana | via entity | via entity | via entity | via entity | YES |
-| Guyana Defence Force | via entity | via entity | via entity | via entity | YES |
-| Guyana Revenue Authority (GRA) | via entity | via entity | via entity | via entity | YES |
-| Caribbean360 | via entity | via entity | via entity | via entity | YES (Intl) |
-| Caribbean National Weekly | via entity | via entity | via entity | via entity | YES (Intl) |
-| Jamaica Gleaner | via entity | via entity | via entity | via entity | YES (Intl) |
-| T&T Guardian | via entity | via entity | via entity | via entity | YES (Intl) |
-| Reuters | via entity | via entity | via entity | via entity | YES (Intl) |
-| BBC News | via entity | via entity | via entity | via entity | YES (Intl) |
-| Al Jazeera | via entity | via entity | via entity | via entity | YES (Intl) |
-| The Guardian | via entity | via entity | via entity | via entity | YES (Intl) |
-| NYT Americas | via entity | via entity | via entity | via entity | YES (Intl) |
-| OilNow | via entity | via entity | via entity | via entity | YES (Intl) |
-| Offshore Energy | via entity | via entity | via entity | via entity | YES (Intl) |
-| Energy Voice | via entity | via entity | via entity | via entity | YES (Intl) |
-
-**Key**:
-- "via entity" = articles from this source are included if they mention the pillar's entities
-- "YES" = all articles from this source are included (Pillar 5 is source-based, not entity-based)
+> Component-by-component analysis of what can be reused from NoNewsBackend for War Room.
 
 ---
 
-## Entities (from War Room "All Entities" Dropdown)
-
-These are the entities visible in the War Room UI. They map to `story_entities.entity_name`.
-
-### People
-
-| Entity | Type | Pillar | Aliases |
-|--------|------|--------|---------|
-| Irfaan Ali | PERSON | 1 (President Ali) | President Ali, Dr. Ali, Dr. Irfaan Ali, Mohamed Irfaan Ali |
-| Bharrat Jagdeo | PERSON | 2 (VP Jagdeo) | VP Jagdeo, Vice President Jagdeo, Dr. Jagdeo |
-| Aubrey Norton | PERSON | 4 (Opposition) | Leader of the Opposition, Norton |
-| Azruddin Mohamed | PERSON | 3 (Azruddin) | Mohamed Azruddin |
-
-### Organizations
-
-| Entity | Type | Pillar | Aliases |
-|--------|------|--------|---------|
-| PPP/C | ORG | — | People's Progressive Party, PPP, PPP Civic |
-| APNU+AFC | ORG | 4 (Opposition) | APNU, AFC, PNC, A Partnership for National Unity, Alliance for Change |
-| ExxonMobil Guyana | ORG | — | ExxonMobil, Exxon, Esso Exploration |
-| GECOM | ORG | — | Guyana Elections Commission |
-
-### Locations
-
-| Entity | Type | Pillar | Notes |
-|--------|------|--------|-------|
-| Georgetown | LOC | — | Capital city |
-| Linden | LOC | — | Second largest town |
-| Region 4 | LOC | — | Most populated region |
-| Stabroek Market | LOC | — | Landmark/commercial area |
-
-### How Entities Flow Through the System
-
-```
-Article ingested (news_article_processor_worker)
-    ↓
-Article clustered into story (story_clustering_worker)
-    ↓
-Entities extracted → stored in story_entities table
-    ↓
-Pillar digest generation queries story_entities
-    ↓
-match_stories_for_pillar() RPC:
-    - Filters stories where story_entities overlaps with pillar.entity_filters
-    - Boosts ranking for stories with more entity matches
-```
-
-### Entity Extraction Quality
-
-The current system extracts entities during story clustering. Quality depends on:
-1. **NER accuracy** — proper nouns like "Irfaan Ali" are well-detected
-2. **Alias coverage** — "President Ali" vs "Dr. Ali" may be stored as different entities
-3. **Entity normalization** — currently no deduplication of aliases
-
-### Recommendation: Entity Alias Resolution
-
-For War Room, the simplest approach is to include ALL aliases in the pillar's `entity_filters` array:
-
-```python
-# In pillar_configs table:
-entity_filters = [
-    'Irfaan Ali',        # Exact name
-    'President Ali',     # Title + last name
-    'Dr. Ali',           # Honorific + last name
-    'Dr. Irfaan Ali',    # Full with honorific
-    'Mohamed Irfaan Ali' # Full legal name
-]
-```
-
-The `match_stories_for_pillar` RPC checks `story_entities.entity_name = ANY(pillar_entities)`, so including all aliases ensures comprehensive matching without needing a separate alias resolution system.
+## Overall Reuse Score: ~70-75%
 
 ---
 
-## Live Feed Counts (from UI Screenshots)
+## 1. RSS Ingestion Pipeline — 95% Reusable
 
-The UI shows article counts per source feed (Domestic Guyana):
+### Existing Component
+- **File**: `cloud_functions/news_article_processor_worker/main.py`
+- **What it does**: Fetches RSS feeds, extracts article content (newspaper3k + trafilatura fallback), stores in GCS, deduplicates via content hash, publishes to Pub/Sub
 
-| Source | Count (at time of screenshot) |
-|--------|------|
-| Stabroek News | 25 |
-| Kaieteur News | 25 |
-| Guyana Chronicle | 10 |
-| News Room Guyana | 10 |
-| Guyana Revenue Authority (GRA) | 10 |
-| Dept. of Public Information (DPI) | 5 |
-| Guyana News & Information | 5 |
-| Conversation Tree | 10 |
+### War Room Mapping
+- War Room sources (Stabrook News, Kaieteur News, etc.) are RSS feeds — **identical use case**
+- Each War Room source just needs a row in the `sources` table with its RSS URL
+- Content extraction, GCS upload, deduplication — all work as-is
 
-International/regional sources (Caribbean360, Reuters, BBC, etc.) appear in the "All Sources" filter for Foreign: Guyana and are included in the full source list above.
-
-This indicates active RSS feeds with regular publishing — good signal that the ingestion pipeline will have steady input.
+### Changes Needed
+- **None for the worker itself**
+- Just add War Room RSS source URLs to the `sources` table (admin/migration)
+- Optionally: tag sources with a `platform` field to distinguish War Room vs No News sources (see [03_NEW_TABLES_AND_MIGRATIONS.md](./03_NEW_TABLES_AND_MIGRATIONS.md))
 
 ---
 
-## Toolbar Features Mapping (from UI Screenshots)
+## 2. Story Clustering — 90% Reusable
 
-The War Room UI toolbar shows: `CSV | EMAIL | BRIEF | NARRATIVES`
+### Existing Component
+- **File**: `cloud_functions/story_clustering_worker/main.py`
+- **What it does**: Groups articles into stories using pgvector similarity (0.75-0.77 threshold) + entity Jaccard overlap (10%+)
+- **Embedding**: Gemini embedding-001, 768 dimensions, HNSW index
 
-| Feature | Backend Support | Notes |
-|---------|----------------|-------|
-| CSV | NEW — `export_service.py` | Simple tabular export |
-| EMAIL | NEW — SendGrid integration | See [06_DOCUMENT_EXPORT.md](./06_DOCUMENT_EXPORT.md) |
-| BRIEF | REUSE — `create_detailed_story_prompt()` | Existing detailed report generation |
-| NARRATIVES | REUSE — `create_opposite_sides_prompt()` | Existing debate/narrative generation |
+### War Room Mapping
+- War Room needs articles grouped into stories — **exact same requirement**
+- Entity overlap validation catches Guyana-specific entities (Ali, Jagdeo, APNU+AFC) — works perfectly
+- Dynamic thresholds (Day 1: 0.75, Day 2: 0.77) — appropriate for fast-moving political news
 
----
-
-## Filter Dropdowns → Backend Queries
-
-| UI Filter | Backend Implementation |
-|-----------|----------------------|
-| All Topics | `story_categories` table — filter by category slug |
-| All Tones | NEW — sentiment field (not yet in DB, needs Phase 7) |
-| All (time range: 1H, 6H, 24H, 7D, Custom) | `stories.last_article_date > NOW() - interval` |
-| All Sources | `story_articles → artifacts → raw_items → sources` join |
-| All Entities | `story_entities.entity_name` filter |
-| All Types | TBD — may map to `story_categories` or a new type field |
+### Changes Needed
+- **None** — clustering is entity-agnostic and embedding-based, works on any domain
+- Consider: May want slightly lower thresholds for political news (stories diverge faster) — **tunable later**
 
 ---
 
-## Data Volume Estimates
+## 3. Story Merge Processor — 100% Reusable
 
-Based on 23 sources (12 domestic Guyana + 11 international/regional) publishing ~10-25 articles each per day for domestic, variable for international:
+### Existing Component
+- **File**: `cloud_functions/story_merge_processor/main.py`
+- **What it does**: Runs every 30 min, finds similar stories missed by real-time clustering, merges them (0.85 threshold)
 
-| Metric | Estimate |
-|--------|----------|
-| Domestic sources | 12 (Stabroek, Kaieteur, Chronicle, etc.) |
-| International sources | 11 (Caribbean360, Reuters, BBC, OilNow, etc.) |
-| Articles/day | 200-500+ |
-| Stories/day (after clustering) | 50-120 |
-| Stories per pillar digest | 5-15 |
-| Entities per story | 3-8 |
-| Storage per day | ~8-15 MB (articles in GCS) |
+### War Room Mapping
+- Identical need — prevents duplicate stories about same political event
+- No changes needed
 
-This is well within the existing system's capacity (designed for thousands of articles/day).
+---
+
+## 4. Entity Extraction — 85% Reusable
+
+### Existing Component
+- **Table**: `story_entities` (entity_name, entity_type, frequency, relevance)
+- **Extracted during**: Story clustering worker
+- **Used by**: Newsletter matching (entity reranking in `search_stories_semantic_reranked`)
+
+### War Room Mapping
+- War Room entities from screenshots: Irfaan Ali, Bharrat Jagdeo, Aubrey Norton, Azruddin Mohamed, PPP/C, APNU+AFC, ExxonMobil Guyana, GECOM, Georgetown, Linden, Region 4, Stabroek Market
+- These will naturally appear in `story_entities` as articles are processed
+- Entity matching is string-based — handles proper nouns well
+
+### Changes Needed
+- **Entity normalization**: May need aliases (e.g., "President Ali" = "Irfaan Ali" = "Dr. Ali")
+- Add a `pillar_entity_aliases` mapping table or config (see [03_NEW_TABLES_AND_MIGRATIONS.md](./03_NEW_TABLES_AND_MIGRATIONS.md))
+
+---
+
+## 5. LLM Service — 90% Reusable
+
+### Existing Component
+- **File**: `cloud_functions/api_service/llm_service.py`
+- **Model**: OpenRouter → Gemini 2.5 Flash Lite
+- **Functions**: `generate_with_gemini()`, `generate_profile_embedding()`, 7 prompt types
+
+### War Room Mapping
+The following existing prompts directly serve War Room digest needs:
+
+| War Room Digest Section | Existing LLM Prompt | File Reference |
+|---|---|---|
+| Top Stories (2-3 sentence summary) | `create_concise_prompt()` | llm_service.py |
+| Key Quotes | `create_quotes_with_sources_prompt()` + `parse_quotes_with_sources()` | llm_service.py |
+| Detailed Report | `create_detailed_story_prompt()` | llm_service.py |
+| Suggested Questions | `create_suggested_questions_prompt()` | llm_service.py |
+
+### Changes Needed (New Prompts)
+- **Sentiment Analysis prompt**: New — "Analyze overall tone: positive/neutral/negative" (see [05_DIGEST_GENERATION_ENGINE.md](./05_DIGEST_GENERATION_ENGINE.md))
+- **Digest Introduction prompt**: New — brief AI-generated overview paragraph for each pillar digest
+- **Max tokens**: May need to increase from 1200 for digest-level summaries
+
+---
+
+## 6. Newsletter System — 80% Reusable (KEY COMPONENT)
+
+### Existing Component
+- **File**: `cloud_functions/api_service/newsletter_service.py` (97KB)
+- **Core method**: `generate_user_newsletter()` — takes `profile_embedding`, `profile_entities`, `profile_categories`, searches stories via pgvector, deduplicates, stores results
+
+### War Room Mapping
+**Each War Room pillar IS a newsletter** with pre-configured parameters:
+
+| Newsletter Concept | War Room Equivalent |
+|---|---|
+| `user_newsletters` table | `pillars` config table |
+| `profile_embedding` | Pillar description embedding |
+| `profile_entities` | Pillar entity filter list |
+| `newsletter_slug` | Pillar slug (e.g., `ali-digest`) |
+| `generate_user_newsletter()` | Digest generation per pillar |
+| `generate-daily-newsletters` batch endpoint | Background pillar digest refresh (Cloud Scheduler) |
+
+### What Works As-Is
+- `search_stories_semantic_reranked()` — pgvector + entity reranking + category filtering
+- Story deduplication (milestone-based)
+- Batch generation with ThreadPoolExecutor
+- Newsletter storage in `user_daily_newsletters`
+
+### Changes Needed
+- New `pillar_configs` table with hardcoded entity/source filters per pillar
+- New `generate_pillar_digest()` method that wraps `generate_user_newsletter()` with pillar-specific params
+- Source-level filtering (current system filters by entity/category but not by specific source IDs)
+- See [02_PILLAR_NEWSLETTER_MAPPING.md](./02_PILLAR_NEWSLETTER_MAPPING.md) for full details
+
+---
+
+## 7. Database Layer — 80% Reusable
+
+### Existing Component
+- **File**: `cloud_functions/api_service/database.py` (79KB)
+- **Classes**: StoryDatabase, NewsletterDatabase, SubscriptionDatabase, TemplateDatabase, AnalyticsDatabase, StoryAIContentDatabase
+
+### War Room Mapping
+- `StoryDatabase.get_story_by_id()`, `fetch_stories_by_ids()`, `search_stories_semantic_reranked()` — all reusable
+- `StoryDatabase.get_source_urls_for_story()` — needed for digest source attribution
+- `NewsletterDatabase` CRUD operations — reusable for pillar digest storage
+
+### Changes Needed
+- New `PillarDatabase` class or extend `NewsletterDatabase` with pillar-specific queries
+- New RPC function: `match_stories_for_pillar()` — like `match_stories_for_newsletter` but with source_id filtering
+- See [03_NEW_TABLES_AND_MIGRATIONS.md](./03_NEW_TABLES_AND_MIGRATIONS.md)
+
+---
+
+## 8. API Service (Flask) — 70% Reusable
+
+### Existing Component
+- **File**: `cloud_functions/api_service/main.py` + route files
+- **Infrastructure**: Flask, Blueprints, CORS, rate limiting, JWT auth, error handling, health check
+
+### War Room Mapping
+- Flask app structure, error handling, auth — fully reusable
+- Rate limiting config — reusable
+- Service registry pattern — reusable
+- CORS — need to add War Room domain (`v0-guyana-news-war-room.vercel.app` + production domain)
+
+### Changes Needed
+- New Blueprint: `routes_warroom.py` or `routes_digests.py` for pillar digest endpoints
+- Add War Room CORS origins to `config.py`
+- New endpoints (see [04_API_ENDPOINTS.md](./04_API_ENDPOINTS.md))
+
+---
+
+## 9. Authentication — 100% Reusable
+
+### Existing Component
+- **File**: `cloud_functions/api_service/utils_auth.py`
+- JWT verification via Supabase, `@require_auth` decorator
+
+### War Room Mapping
+- Same Supabase project = same auth
+- Same JWT verification
+- No changes needed
+
+---
+
+## 10. Validation & Error Handling — 100% Reusable
+
+### Existing Components
+- `utils_validation.py` — input validation, sanitization
+- `utils_errors.py` — error hierarchy, logging
+- `utils_helpers.py` — CORS, logging, response formatting
+
+### War Room Mapping
+- All reusable without modification
+
+---
+
+## 11. Export / Document Generation — 0% (NEW)
+
+### Existing
+- **No export functionality exists** in the current codebase
+- No Word, PDF, CSV (despite CSV button in War Room UI), or email export
+
+### War Room Needs
+- Word (.docx) generation
+- PDF generation
+- Email delivery
+- CSV export (seen in screenshot toolbar)
+
+### Must Build From Scratch
+- See [06_DOCUMENT_EXPORT.md](./06_DOCUMENT_EXPORT.md) for full implementation details
+
+---
+
+## 12. Sentiment Analysis — 0% (NEW)
+
+### Existing
+- No sentiment analysis in current codebase
+- The War Room UI shows sentiment tags (FAVORABLE, NEUTRAL, LOW/MED) but these aren't generated by this backend
+
+### War Room Needs
+- Per-article sentiment (already shown in UI — may come from frontend or separate service)
+- Per-digest overall sentiment note
+
+### Must Build
+- New LLM prompt for sentiment classification
+- Simple: "Classify this content as positive/neutral/negative toward [entity]"
+- See [05_DIGEST_GENERATION_ENGINE.md](./05_DIGEST_GENERATION_ENGINE.md)
+
+---
+
+## Summary Table
+
+| Component | Reuse % | Changes Needed |
+|---|---|---|
+| RSS Ingestion Worker | 95% | Add War Room source URLs to DB |
+| Story Clustering Worker | 90% | None (maybe tune thresholds later) |
+| Story Merge Processor | 100% | None |
+| Entity Extraction | 85% | Add entity alias mapping |
+| LLM Service | 90% | Add sentiment + digest intro prompts |
+| Newsletter Service | 80% | Add pillar-specific generation wrapper |
+| Database Layer | 80% | Add pillar tables + source-filtered RPC |
+| API Service (Flask) | 70% | Add War Room routes + CORS |
+| Authentication | 100% | None |
+| Validation/Errors | 100% | None |
+| Document Export | 0% | Build from scratch |
+| Sentiment Analysis | 0% | Build from scratch |
+| **Overall** | **~70-75%** | |
