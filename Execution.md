@@ -270,32 +270,32 @@ When a user clicks "Ali Digest", they get:
 
 ## Delivery Plan
 
-### 🟢 Phase 1 — Foundation (Days 1-3)
+### 🟢 Phase 1 — Foundation
 **Goal**: Database ready, sources connected, pillars configured.
 
-| Task | What Happens | Who Validates |
-|------|-------------|---------------|
-| Add `platform` column to existing `sources` table | One `ALTER TABLE` — adds a `platform` column (values: `'nonews'`, `'warroom'`). Existing sources default to `'nonews'`. **No other changes to the sources table.** | Engineer runs `SELECT platform FROM sources` and confirms column exists |
-| Add 12 Guyana RSS feed sources to `sources` table | Stabrook News, Kaieteur News, etc. inserted into the **same existing `sources` table** with `platform = 'warroom'`. The ingestion pipeline picks them up automatically — no worker changes needed. | PM verifies source names match War Room UI |
-| Create pillar configuration database table | **NEW `pillar_configs` table**. We will run a one-time "seeder" script to manually insert the 6 pillars (names, description, exact entities) just like we do for NoNews `user_newsletters`. | Engineer runs query, confirms 6 pillars exist |
-| Create digest storage table | Place to store generated digests | Engineer confirms table created |
-| Generate AI embeddings for each pillar | The seeder script runs the 6 pillar descriptions through Gemini to generate AI embeddings automatically. | Engineer confirms all 6 have embeddings |
-| Create story matching function | SQL function (`match_stories_for_pillar`) that finds stories per pillar using semantic + entity matches, mimicking the existing newsletter matcher. | Engineer tests: "ali-digest" returns Ali-related stories |
+| Task | What Happens |
+|------|-------------|
+| Add `platform` column to existing `sources` table | One `ALTER TABLE` — adds a `platform` column (values: `'nonews'`, `'warroom'`). Existing sources default to `'nonews'`. **No other changes to the sources table.** |
+| Add 12 Guyana RSS feed sources to `sources` table | Stabrook News, Kaieteur News, etc. inserted into the **same existing `sources` table** with `platform = 'warroom'`. The ingestion pipeline picks them up automatically — no worker changes needed. |
+| Create pillar configuration database table | **NEW `pillar_configs` table**. We will run a one-time "seeder" script to manually insert the 6 pillars (names, description, exact entities) just like we do for NoNews `user_newsletters`. |
+| Create digest storage table | Place to store generated digests |
+| Generate AI embeddings for each pillar | The seeder script runs the 6 pillar descriptions through Gemini to generate AI embeddings automatically. |
+| Create story matching function | SQL function (`match_stories_for_pillar`) that finds stories per pillar using semantic + entity matches, mimicking the existing newsletter matcher. |
 
 **Milestone**: ✅ System can find and return stories for each pillar
 
 ---
 
-### 🟡 Phase 2 — Core Digest Engine (Days 4-7)
+### 🟡 Phase 2 — Core Digest Engine
 **Goal**: Can generate a complete digest for any pillar.
 *Technical Note: This service (`digest_service.py`) will be a near 1-to-1 copy of our existing NoNews `newsletter_service.py`. It uses the exact same AI summarization and quote extraction methods, just adapted for the 6 War Room pillars.*
 
-| Task | What Happens | Who Validates |
-|------|-------------|---------------|
-| Build digest generation service | Core logic: uses existing NoNews architecture to fetch stories → summarize → extract quotes → compile. Very high code reuse. | Engineer tests all 6 pillars |
-| Add sentiment analysis AI prompt | New AI prompt classifies tone as positive/neutral/negative | PM reviews sentiment accuracy on 10 sample stories |
-| Add digest introduction AI prompt | AI writes 2-3 sentence executive summary per digest | PM reviews quality of introductions |
-| Integrate with existing AI content | Reuse pre-computed summaries and quotes (already in database) | Engineer confirms no duplicate AI calls |
+| Task | What Happens |
+|------|-------------|
+| Build digest generation service | Core logic: uses existing NoNews architecture to fetch stories → summarize → extract quotes → compile. Very high code reuse. |
+| Add sentiment analysis AI prompt | New AI prompt classifies tone as positive/neutral/negative |
+| Add digest introduction AI prompt | AI writes 2-3 sentence executive summary per digest |
+| Integrate with existing AI content | Reuse pre-computed summaries and quotes (already in database) |
 
 **Milestone**: ✅ Running a function produces a complete digest JSON with stories, quotes, sentiment
 
@@ -303,31 +303,31 @@ When a user clicks "Ali Digest", they get:
 
 ---
 
-### 🔵 Phase 3 — API & Frontend Integration (Days 8-10)
+### 🔵 Phase 3 — API & Frontend Integration
 **Goal**: Frontend can call backend and display digests.
 
-| Task | What Happens | Who Validates |
-|------|-------------|---------------|
-| Build "List Pillars" endpoint | Frontend calls → gets list of 5 pillars with status | Frontend engineer confirms data renders |
-| Build "Generate Digest" endpoint | **THE ONE-CLICK BUTTON** — frontend calls → gets full digest | PM clicks button in War Room UI, sees digest |
-| Build "Get Latest Digest" endpoint | Returns pre-generated digest instantly (no wait) | PM confirms instant response |
-| Build "Digest History" endpoint | View past digests by date | PM can browse previous days |
-| Add War Room domain to allowed origins | CORS security — allows War Room frontend to talk to backend | Frontend engineer confirms no CORS errors |
+| Task | What Happens |
+|------|-------------|
+| Build "List Pillars" endpoint | Frontend calls → gets list of 6 pillars with status |
+| Build "Generate Digest" endpoint | **THE ONE-CLICK BUTTON** — frontend calls → gets full digest |
+| Build "Get Latest Digest" endpoint | Returns pre-generated digest instantly (no wait) |
+| Build "Digest History" endpoint | View past digests by date |
+| Add War Room domain to allowed origins | CORS security — allows War Room frontend to talk to backend |
 
 **Milestone**: ✅ PM can open War Room, click a pillar button, and see a digest
 
 ---
 
-### 🟣 Phase 4 — Document Export (Days 11-13)
+### 🟣 Phase 4 — Document Export
 **Goal**: Digests downloadable as Word and PDF.
 
-| Task | What Happens | Who Validates |
-|------|-------------|---------------|
-| Build Word (.docx) generator | Converts digest into formatted Word document | PM downloads and opens in Word/Google Docs |
-| Build PDF generator | Converts digest into formatted PDF | PM downloads and opens in browser |
-| Build CSV export | Tabular export of story data | PM downloads and opens in Excel |
-| Upload documents to cloud storage | Files stored securely with 24-hour download links | Engineer confirms links expire correctly |
-| Build "Export" API endpoint | Frontend calls → gets download link | PM clicks export button in UI, download starts |
+| Task | What Happens |
+|------|-------------|
+| Build Word (.docx) generator | Converts digest into formatted Word document |
+| Build PDF generator | Converts digest into formatted PDF |
+| Build CSV export | Tabular export of story data |
+| Upload documents to cloud storage | Files stored securely with 24-hour download links |
+| Build "Export" API endpoint | Frontend calls → gets download link |
 
 **Milestone**: ✅ PM can download a professional-looking digest document
 
@@ -335,14 +335,14 @@ When a user clicks "Ali Digest", they get:
 
 ---
 
-### 🟠 Phase 5 — Auto-Refresh (Days 14-15)
+### 🟠 Phase 5 — Auto-Refresh
 **Goal**: Digests are always fresh — no waiting when user clicks.
 
-| Task | What Happens | Who Validates |
-|------|-------------|---------------|
-| Set up scheduled job (every 3 hours) | System automatically regenerates all 5 pillar digests | Engineer confirms job runs in cloud console |
-| Wire refresh endpoint | Scheduled job calls backend → all pillars refresh | Engineer checks logs for successful refreshes |
-| Verify instant response | When user clicks button, they get pre-generated digest (< 1 second) | PM clicks button → digest appears instantly |
+| Task | What Happens |
+|------|-------------|
+| Set up scheduled job (every 3 hours) | System automatically regenerates all 6 pillar digests |
+| Wire refresh endpoint | Scheduled job calls backend → all pillars refresh |
+| Verify instant response | When user clicks button, they get pre-generated digest (< 1 second) |
 
 **Milestone**: ✅ Digests are always pre-generated and ready — one-click feels instant
 
@@ -350,37 +350,21 @@ When a user clicks "Ali Digest", they get:
 
 ---
 
-### 🔴 Phase 6 — Email & Polish (Days 16-22)
+### 🔴 Phase 6 — Email & Polish
 **Goal**: Full feature set — email delivery, story filtering, refinements.
 
-| Task | What Happens | Who Validates |
-|------|-------------|---------------|
-| Set up email service (SendGrid) | Backend can send emails with attachments | Engineer sends test email |
-| Build "Email Digest" endpoint | User enters email → digest sent as PDF/Word attachment | PM receives digest email |
-| Build story filtering API | Powers the source/entity/tone filter dropdowns in War Room UI | PM tests each filter dropdown |
-| Refine sentiment accuracy | Iterate on AI prompts based on PM feedback | PM reviews 20+ sentiment classifications |
-| Polish document templates | Refine Word/PDF formatting based on PM/client feedback | PM approves final document design |
-| End-to-end testing | All flows tested together | PM runs full walkthrough |
+| Task | What Happens |
+|------|-------------|
+| Set up email service (SendGrid) | Backend can send emails with attachments |
+| Build "Email Digest" endpoint | User enters email → digest sent as PDF/Word attachment |
+| Build story filtering API | Powers the source/entity/tone filter dropdowns in War Room UI |
+| Refine sentiment accuracy | Iterate on AI prompts based on PM feedback |
+| Polish document templates | Refine Word/PDF formatting based on PM/client feedback |
+| End-to-end testing | All flows tested together |
 
 **Milestone**: ✅ All features from the brief are working
 
 ---
-
-## Timeline Visual
-
-```
-Week 1                    Week 2                    Week 3
-─────────────────────     ─────────────────────     ─────────────
-│ Phase 1 │ Phase 2 │     │ Phase 3 │ Phase 4 │     │Ph 5│ Ph 6 │
-│ DB +    │ Digest  │     │ API +   │ Export  │     │Auto│ Email│
-│ Sources │ Engine  │     │ Frontend│ Docs    │     │    │Polish│
-│         │         │     │         │         │     │    │      │
-│ Day 1-3 │ Day 4-7 │     │ Day 8-10│Day 11-13│     │14  │16-22 │
-─────────────────────     ─────────────────────     ─────────────
-         ↑                         ↑                       ↑
-    First stories            PM sees digest          Full launch
-    matched to pillars       in War Room UI          ready
-```
 
 ---
 
